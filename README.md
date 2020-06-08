@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 ## Run Images by SMS
 
-Load your API key, Airtable bases, and option local test parameters.
+Load your API key, Airtable bases, and optional local test parameters.
 
 ```shell
 source env.sh

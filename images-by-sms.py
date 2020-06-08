@@ -44,17 +44,15 @@ def assemble_filename(data):
     yyyy_mm_dd = date_received_local.strftime('%Y-%m-%d')
     hhmm = date_received_local.strftime('%H%M')
 
-    # get sender_id from to, from
-    sender_id = create_sender_id(data['To Phone'], data['From Phone'])
-
     # get two random digits
     random_digits = SystemRandom().randint(0,99)
 
     # assemble filename
-    return '{}_{}_{}_{}_{}'.format(yyyy_mm_dd, sender_id, hhmm, random_digits, chapter_abbreviation)
+    return '{}_{}_{}_{}_{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, chapter_abbreviation)
 
 def post_to_airtable(data):
     del data['Message']  # linked field, needs to be handled differently
+    del data['Sender']  # linked field, needs to be handled differently
     del data['To Phone']  # not used
     del data['From Phone']  # not used
     photos_table.insert(data)
@@ -70,7 +68,13 @@ def post_to_slack(data):
     print(data)
 
 def handle_photo(data):
+    # get sender ID from to, from
+    data['Sender'] = create_sender_id(data['To Phone'], data['From Phone'])
+
+    # assemble filename
     data['Filename'] = assemble_filename(data)
+
+    # post the message to the various destinations
     post_to_airtable(data)
     post_to_gdrive(data)
     post_to_slack(data)

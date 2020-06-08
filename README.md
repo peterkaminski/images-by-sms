@@ -37,7 +37,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Run Airtable Schema to Base
+## Run Images by SMS
 
 Load your API key, Airtable bases, and option local test parameters.
 

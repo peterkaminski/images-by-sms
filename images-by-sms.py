@@ -50,9 +50,26 @@ def assemble_filename(data):
     # assemble filename
     return '{}_{}_{}_{}_{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, chapter_abbreviation)
 
+def find_or_insert(table, field, data):
+    record = table.match(field, data[field])
+    if len(record) == 0:
+        record = table.insert(data)
+    return record['id']
+
 def post_to_airtable(data):
-    del data['Message']  # linked field, needs to be handled differently
-    del data['Sender']  # linked field, needs to be handled differently
+    # get or set sender_record_id
+    sender_record_id = find_or_insert(senders_table, 'ID', {'ID': data['Sender']})
+    del data['Sender']  # don't need field in data anymore
+
+    # save message, get message record ID
+    message_data = {
+        'Chapter':'NYI',
+        'Sender':[sender_record_id],
+        'Text':data['Message Body']
+    }
+    data['Message'] = [messages_table.insert(message_data)['id']]
+    del data['Message Body']  # don't need field in data anymore
+
     del data['To Phone']  # not used
     del data['From Phone']  # not used
     photos_table.insert(data)
@@ -81,7 +98,7 @@ def handle_photo(data):
 
 def main():
     data = {
-        'Message': os.environ['MESSAGE_BODY'],
+        'Message Body': os.environ['MESSAGE_BODY'],
         'To Phone': os.environ['TO_PHONE'],
         'From Phone': os.environ['FROM_PHONE'],
         'Photo': [{'url': os.environ['MEDIA_URL']}]

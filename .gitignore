@@ -1,6 +1,8 @@
 # secrets
 env.sh
 client_secrets.json
+credentials.json
+settings.yaml
 
 # python
 venv

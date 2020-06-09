@@ -4,6 +4,8 @@
 from airtable import Airtable # pip install airtable-python-wrapper
 from flask import Flask, request # pip install flask
 from twilio.twiml.messaging_response import MessagingResponse # pip install twilio
+from pydrive.auth import GoogleAuth # pip install PyDrive
+from pydrive.drive import GoogleDrive # pip install PyDrive
 import pendulum # pip install pendulum
 
 # Python
@@ -26,21 +28,16 @@ photos_table = Airtable(airtable_base_phoso, 'Photos', api_key=airtable_api_key)
 senders_table = Airtable(airtable_base_phoso, 'Senders', api_key=airtable_api_key)
 chapters_table = Airtable(airtable_base_images_by_sms, 'Chapter Setup', api_key=airtable_api_key)
 
+# set up Google Drive connection
+gauth = GoogleAuth()
+gdrive = GoogleDrive(gauth)
+
 def create_sender_id(recipient, sender):
     hash = hmac.digest(recipient.encode(), sender.encode(), 'sha256')
     hash = b64encode(hash).decode('utf-8').upper()
     return re.sub(r'[^A-Z]', '', hash)[:8]
 
-def assemble_filename(data):
-    # get date received in UTC
-    date_received = pendulum.now()
-
-    # get chapter data
-    chapter_row = chapters_table.match('SMS Phone Number', data['To Phone'])
-    chapter_abbreviation = chapter_row['fields']['City Name Abbreviation']
-    chapter_timezone = chapter_row['fields']['Timezone']
-    date_received_local = date_received.in_timezone(chapter_timezone)
-
+def assemble_filename(data, chapter_abbreviation, date_received_local):
     # get local date and time
     yyyy_mm_dd = date_received_local.strftime('%Y-%m-%d')
     hhmm = date_received_local.strftime('%H%M')
@@ -77,32 +74,47 @@ def post_to_airtable(data):
     # save photo to table
     photos_table.insert(data)
 
-def post_to_gdrive(data, filename):
-    print("post_to_gdrive:")
-    print(data)
-    print(filename)
+def post_to_gdrive(data, filename, folder):
+    file = gdrive.CreateFile({
+        'title': data['Filename'] + '.png',
+        'parents': [{'id':folder}]
+    })
+    file.SetContentFile(filename)
+    file.Upload()
 
 def post_to_slack(data):
     print("post_to_slack:")
     print(data)
 
 def handle_photo(data):
+    # get date received in UTC
+    date_received = pendulum.now()
+
     # get sender ID from to, from
     data['Sender'] = create_sender_id(data['To Phone'], data['From Phone'])
 
+    # get chapter data
+    chapter_row = chapters_table.match('SMS Phone Number', data['To Phone'])
+    chapter_timezone = chapter_row['fields']['Timezone']
+    chapter_gdrive_folder = chapter_row['fields']['Google Drive Folder']
+
     # assemble filename
-    data['Filename'] = assemble_filename(data)
+    data['Filename'] = assemble_filename(
+        data,
+        chapter_row['fields']['City Name Abbreviation'],
+        date_received.in_timezone(chapter_timezone)
+    )
 
     # retrieve photo from URL
-    photo_filename, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
+    tmp_file_path, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
 
     # post the message to the various destinations
     post_to_airtable(data)
-    post_to_gdrive(data, photo_filename)
+    post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
     post_to_slack(data)
 
     # delete local copy of photo
-    os.remove(photo_filename)
+    os.remove(tmp_file_path)
 
 def main():
     data = {

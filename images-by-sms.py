@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import os
 import re
+import urllib.request
 
 # get auth keys from environment
 airtable_api_key = os.environ['AIRTABLE_API_KEY']
@@ -72,13 +73,14 @@ def post_to_airtable(data):
 
     del data['To Phone']  # not used
     del data['From Phone']  # not used
-    photos_table.insert(data)
-    print("post_to_airtable:")
-    print(data)
 
-def post_to_gdrive(data):
+    # save photo to table
+    photos_table.insert(data)
+
+def post_to_gdrive(data, filename):
     print("post_to_gdrive:")
     print(data)
+    print(filename)
 
 def post_to_slack(data):
     print("post_to_slack:")
@@ -91,10 +93,16 @@ def handle_photo(data):
     # assemble filename
     data['Filename'] = assemble_filename(data)
 
+    # retrieve photo from URL
+    photo_filename, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
+
     # post the message to the various destinations
     post_to_airtable(data)
-    post_to_gdrive(data)
+    post_to_gdrive(data, photo_filename)
     post_to_slack(data)
+
+    # delete local copy of photo
+    os.remove(photo_filename)
 
 def main():
     data = {

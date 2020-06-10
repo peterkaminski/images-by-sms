@@ -6,6 +6,8 @@ from flask import Flask, request # pip install flask
 from twilio.twiml.messaging_response import MessagingResponse # pip install twilio
 from pydrive.auth import GoogleAuth # pip install PyDrive
 from pydrive.drive import GoogleDrive # pip install PyDrive
+from slack import WebClient # pip install slackclient
+from slack.errors import SlackApiError # pip install slackclient
 import pendulum # pip install pendulum
 
 # Python
@@ -31,6 +33,9 @@ chapters_table = Airtable(airtable_base_images_by_sms, 'Chapter Setup', api_key=
 # set up Google Drive connection
 gauth = GoogleAuth()
 gdrive = GoogleDrive(gauth)
+
+# set up Slack connection
+slack_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
 
 def create_sender_id(recipient, sender):
     hash = hmac.digest(recipient.encode(), sender.encode(), 'sha256')
@@ -65,14 +70,13 @@ def post_to_airtable(data):
         'Sender':[sender_record_id],
         'Text':data['Message Body']
     }
-    data['Message'] = [messages_table.insert(message_data)['id']]
-    del data['Message Body']  # don't need field in data anymore
-
-    del data['To Phone']  # not used
-    del data['From Phone']  # not used
 
     # save photo to table
-    photos_table.insert(data)
+    photos_table.insert({
+        'Photo': data['Photo'],
+        'Filename': data['Filename'],
+        'Message': [messages_table.insert(message_data)['id']]
+    })
 
 def post_to_gdrive(data, filename, folder):
     file = gdrive.CreateFile({
@@ -82,9 +86,27 @@ def post_to_gdrive(data, filename, folder):
     file.SetContentFile(filename)
     file.Upload()
 
-def post_to_slack(data):
-    print("post_to_slack:")
-    print(data)
+def post_to_slack(data, chapter_slack_channel):
+    try:
+      response = slack_client.chat_postMessage(
+          channel=chapter_slack_channel,
+          blocks=[
+              {
+                  'type': 'section',
+                  'text': {
+                      'type': 'plain_text',
+                      'text': data['Message Body']
+                  }
+              },
+              {
+                  'type': 'image',
+                  'image_url': data['Photo'][0]['url'],
+                  'alt_text': 'Image from SMS sender'
+              }
+          ]
+      )
+    except SlackApiError as e:
+        print(e.response["error"])
 
 def handle_photo(data):
     # get date received in UTC
@@ -97,6 +119,7 @@ def handle_photo(data):
     chapter_row = chapters_table.match('SMS Phone Number', data['To Phone'])
     chapter_timezone = chapter_row['fields']['Timezone']
     chapter_gdrive_folder = chapter_row['fields']['Google Drive Folder']
+    chapter_slack_channel = chapter_row['fields']['Slack Channel']
 
     # assemble filename
     data['Filename'] = assemble_filename(
@@ -111,7 +134,7 @@ def handle_photo(data):
     # post the message to the various destinations
     post_to_airtable(data)
     post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
-    post_to_slack(data)
+    post_to_slack(data, chapter_slack_channel)
 
     # delete local copy of photo
     os.remove(tmp_file_path)

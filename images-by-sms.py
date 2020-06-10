@@ -181,7 +181,7 @@ def webhook_images_by_sms():
         return ''
 
 if __name__ == "__main__":
-    if os.environ['TO_PHONE']:
+    if 'TO_PHONE' in os.environ:
         exit(main())
     else:
         app.run(port=80, debug=True)

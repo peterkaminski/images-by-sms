@@ -9,7 +9,7 @@
 Receive inbound MMS images from Twilio, and distribute to Airtable,
 Google Drive, and Slack.
 
-**Images by SMS** is written in Python 3.
+**Images by SMS** is written in Python 3.  Python 3.7+ required (for at least hmac.digest()).
 
 ## Setting Up The Airtable Bases
 

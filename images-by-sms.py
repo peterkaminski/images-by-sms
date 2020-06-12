@@ -221,5 +221,5 @@ if __name__ == "__main__":
     if 'TO_PHONE' in os.environ:
         exit(main())
     else:
-        port = os.environ['IMAGES_BY_SMS_PORT', 8000]
+        port = os.environ.get('IMAGES_BY_SMS_PORT', 8000)
         app.run(host='0.0.0.0', port=port, debug=True)

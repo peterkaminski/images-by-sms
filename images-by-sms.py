@@ -145,6 +145,7 @@ def handle_photo(data):
     )
 
     # retrieve photo from URL
+    logging.info('Retrieving photo from {}.'.format(data['Photo'][0]['url']))
     tmp_file_path, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
 
     # post the message to the various destinations

@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import requests
+import traceback
 import urllib.request
 
 # configure logging right away (especially before Flask)
@@ -155,16 +156,16 @@ def handle_photo(data):
     # post the message to the various destinations
     try:
         post_to_airtable(data)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
     try:
         post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
     try:
         post_to_slack(data, chapter_slack_channel)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
 
     # delete local copy of photo
     os.remove(tmp_file_path)

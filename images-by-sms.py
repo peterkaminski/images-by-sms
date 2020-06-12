@@ -100,7 +100,16 @@ def post_to_gdrive(data, filename, folder):
     })
     file.SetContentFile(filename)
     file.Upload()
+    # set to world readable
+    file.InsertPermission({
+        'type': 'anyone',
+        'value': 'anyone',
+        'role': 'reader'}
+    )
+    link=file['alternateLink'].replace('?usp=drivesdk', '')
+    logging.info('File link: <{}>.'.format(link))
     logging.info('Exiting post_to_gdrive().')
+    return link
 
 def post_to_slack(data, chapter_slack_channel):
     logging.info('Entering post_to_slack().')
@@ -113,6 +122,13 @@ def post_to_slack(data, chapter_slack_channel):
                   'text': {
                       'type': 'plain_text',
                       'text': data['Message Body']
+                  }
+              },
+              {
+                  "type": "section",
+                  "text": {
+                      "type": "mrkdwn",
+                      "text": "<{}|{}> (Google Drive)".format(data['Google Drive Link'], data['Filename'])
                   }
               },
               {
@@ -160,7 +176,7 @@ def handle_photo(data):
     except Exception:
         traceback.print_exc()
     try:
-        post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
+        data['Google Drive Link'] = post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
     except Exception:
         traceback.print_exc()
     try:

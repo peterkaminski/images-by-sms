@@ -194,7 +194,7 @@ def webhook_images_by_sms():
 
         # set up data dict from form data
         data = {
-            'Message': request.form['Body'],
+            'Message Body': request.form['Body'],
             'To Phone': request.form['To'],
             'From Phone': request.form['From']
         }

@@ -20,6 +20,14 @@ import os
 import re
 import urllib.request
 
+# configure logging right away (especially before Flask)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# When using logging,basicConfig(), the following is needed for PyDrive. See:
+# * https://github.com/googleapis/google-api-python-client/issues/299
+# * https://github.com/googleapis/google-api-python-client/issues/703
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+
 # get auth keys from environment
 airtable_api_key = os.environ['AIRTABLE_API_KEY']
 airtable_base_phoso = os.environ['AIRTABLE_BASE_PHOSO']
@@ -37,13 +45,6 @@ gdrive = GoogleDrive(gauth)
 
 # set up Slack connection
 slack_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
-
-def configure_logging():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    # workaround for PyDrive, see:
-    # https://github.com/googleapis/google-api-python-client/issues/299
-    # https://github.com/googleapis/google-api-python-client/issues/703
-    logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 def create_sender_id(recipient, sender):
     hash = hmac.digest(recipient.encode(), sender.encode(), 'sha256')
@@ -165,7 +166,6 @@ def handle_photo(data):
     logging.info('Exiting handle_photo().')
 
 def main():
-    configure_logging()
     logging.info('Entering main().')
     data = {
         'Message Body': os.environ['MESSAGE_BODY'],

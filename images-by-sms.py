@@ -24,7 +24,7 @@ import urllib.request
 
 # configure logging right away (especially before Flask)
 LOGLEVEL = os.environ.get('IMAGES_BY_SMS_LOGLEVEL', 'INFO').upper()
-logging.basicConfig(level=logging.LOGLEVEL, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=LOGLEVEL, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # When using logging,basicConfig(), the following is needed for PyDrive. See:
 # * https://github.com/googleapis/google-api-python-client/issues/299

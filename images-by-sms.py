@@ -15,6 +15,7 @@ from base64 import b64decode, b64encode
 from random import SystemRandom
 import hashlib
 import hmac
+import logging
 import os
 import re
 import urllib.request
@@ -36,6 +37,13 @@ gdrive = GoogleDrive(gauth)
 
 # set up Slack connection
 slack_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
+
+def configure_logging():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # workaround for PyDrive, see:
+    # https://github.com/googleapis/google-api-python-client/issues/299
+    # https://github.com/googleapis/google-api-python-client/issues/703
+    logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 def create_sender_id(recipient, sender):
     hash = hmac.digest(recipient.encode(), sender.encode(), 'sha256')
@@ -60,6 +68,7 @@ def find_or_insert(table, field, data):
     return record['id']
 
 def post_to_airtable(data):
+    logging.info('Entering post_to_airtable().')
     # get or set sender_record_id
     sender_record_id = find_or_insert(senders_table, 'ID', {'ID': data['Sender']})
     del data['Sender']  # don't need field in data anymore
@@ -77,16 +86,20 @@ def post_to_airtable(data):
         'Filename': data['Filename'],
         'Message': [messages_table.insert(message_data)['id']]
     })
+    logging.info('Exiting post_to_airtable().')
 
 def post_to_gdrive(data, filename, folder):
+    logging.info('Entering post_to_gdrive().')
     file = gdrive.CreateFile({
         'title': data['Filename'] + '.png',
         'parents': [{'id':folder}]
     })
     file.SetContentFile(filename)
     file.Upload()
+    logging.info('Exiting post_to_gdrive().')
 
 def post_to_slack(data, chapter_slack_channel):
+    logging.info('Entering post_to_slack().')
     try:
       response = slack_client.chat_postMessage(
           channel=chapter_slack_channel,
@@ -107,8 +120,10 @@ def post_to_slack(data, chapter_slack_channel):
       )
     except SlackApiError as e:
         print(e.response["error"])
+    logging.info('Exiting post_to_slack().')
 
 def handle_photo(data):
+    logging.info('Entering handle_photo().')
     # get date received in UTC
     date_received = pendulum.now()
 
@@ -132,14 +147,26 @@ def handle_photo(data):
     tmp_file_path, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
 
     # post the message to the various destinations
-    post_to_airtable(data)
-    post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
-    post_to_slack(data, chapter_slack_channel)
+    try:
+        post_to_airtable(data)
+    except Exception as e:
+        print(e)
+    try:
+        post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
+    except Exception as e:
+        print(e)
+    try:
+        post_to_slack(data, chapter_slack_channel)
+    except Exception as e:
+        print(e)
 
     # delete local copy of photo
     os.remove(tmp_file_path)
+    logging.info('Exiting handle_photo().')
 
 def main():
+    configure_logging()
+    logging.info('Entering main().')
     data = {
         'Message Body': os.environ['MESSAGE_BODY'],
         'To Phone': os.environ['TO_PHONE'],
@@ -147,12 +174,14 @@ def main():
         'Photo': [{'url': os.environ['MEDIA_URL']}]
     }
     handle_photo(data)
+    logging.info('Exiting main().')
 
 app = Flask(__name__)
 
 @app.route("/images-by-sms", methods=['GET', 'POST'])
 def webhook_images_by_sms():
 
+    logging.info('Entering webhook_images_by_sms().')
     try:
         # Start our response
         resp = MessagingResponse()
@@ -179,6 +208,7 @@ def webhook_images_by_sms():
     except Exception as e:
         print(e)
         return ''
+    logging.info('Exiting webhook_images_by_sms().')
 
 if __name__ == "__main__":
     if 'TO_PHONE' in os.environ:

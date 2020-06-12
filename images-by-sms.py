@@ -208,7 +208,7 @@ def webhook_images_by_sms():
         handle_photo(data)
 
         # respond
-        resp.message("Message received!")
+        resp.message(os.environ['IMAGES_BY_SMS_RESPONSE'], "Message received!")
 
         # send response
         return str(resp)

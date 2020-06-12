@@ -184,4 +184,7 @@ if __name__ == "__main__":
     if 'TO_PHONE' in os.environ:
         exit(main())
     else:
-        app.run(port=80, debug=True)
+        port = 8000
+        if 'IMAGES_BY_SMS_PORT' in os.environ:
+            port = os.environ['IMAGES_BY_SMS_PORT']
+        app.run(host='0.0.0.0', port=port, debug=True)

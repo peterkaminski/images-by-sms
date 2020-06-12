@@ -18,6 +18,7 @@ import hmac
 import logging
 import os
 import re
+import requests
 import urllib.request
 
 # configure logging right away (especially before Flask)
@@ -145,8 +146,11 @@ def handle_photo(data):
     )
 
     # retrieve photo from URL
-    logging.info('Retrieving photo from {}.'.format(data['Photo'][0]['url']))
-    tmp_file_path, headers = urllib.request.urlretrieve(data['Photo'][0]['url'])
+    url = data['Photo'][0]['url']
+    logging.info('Retrieving photo from <{}>.'.format(url))
+    request = requests.get(url, allow_redirects=True)
+    logging.info('Final URL after redirects: <{}>.'.format(request.url))
+    tmp_file_path, headers = urllib.request.urlretrieve(request.url)
 
     # post the message to the various destinations
     try:

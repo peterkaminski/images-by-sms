@@ -17,6 +17,7 @@ from random import SystemRandom
 import hashlib
 import hmac
 import logging
+import mimetypes
 import os
 import re
 import requests
@@ -66,8 +67,11 @@ def assemble_filename(data, chapter_abbreviation, date_received_local):
     # get two random digits
     random_digits = SystemRandom().randint(0,99)
 
+    # get probable filename extension
+    extension = mimetypes.guess_extension(data['Content Type'])
+
     # assemble filename
-    return '{}_{}_{}_{}_{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, chapter_abbreviation)
+    return '{}_{}_{}_{}_{}{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, chapter_abbreviation, extension)
 
 def find_or_insert(table, field, data):
     record = table.match(field, data[field])
@@ -303,6 +307,7 @@ def webhook_images_by_sms():
         # add first photo if it exists
         if 'MediaUrl0' in request.form:
             data['Photo'] = [{'url': request.form['MediaUrl0']}]
+            data['Content Type'] = request.form['MediaContentType0']
 
         # TODO: support multiple photos
         send_long_response = handle_photo(data)

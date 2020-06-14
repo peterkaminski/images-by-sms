@@ -71,7 +71,7 @@ def find_or_insert(table, field, data):
         record = table.insert(data)
     return record['id']
 
-def post_to_airtable(data):
+def post_to_airtable(data, chapter_name):
     logging.info('Entering post_to_airtable().')
     # get or set sender_record_id
     sender_record_id = find_or_insert(senders_table, 'ID', {'ID': data['Sender']})
@@ -79,7 +79,7 @@ def post_to_airtable(data):
 
     # save message, get message record ID
     message_data = {
-        'Chapter':'NYI',
+        'Chapter':chapter_name,
         'Sender':[sender_record_id],
         'Text':data['Message Body']
     }
@@ -172,7 +172,7 @@ def handle_photo(data):
 
     # post the message to the various destinations
     try:
-        post_to_airtable(data)
+        post_to_airtable(data, chapter_row['fields']['Chapter Name'])
     except Exception:
         traceback.print_exc()
     try:

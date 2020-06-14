@@ -293,6 +293,7 @@ app = Flask(__name__)
 @app.route("/images-by-sms", methods=['GET', 'POST'])
 def webhook_images_by_sms():
 
+    logging.info('----------------------------------------------------------------')
     logging.info('Entering webhook_images_by_sms().')
     try:
         # Start our response
@@ -323,8 +324,8 @@ def webhook_images_by_sms():
 
         # send response
         return str(resp)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return ''
     logging.info('Exiting webhook_images_by_sms().')
 

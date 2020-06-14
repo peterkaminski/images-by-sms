@@ -31,6 +31,9 @@ logging.basicConfig(level=LOGLEVEL, format='%(asctime)s - %(levelname)s - %(mess
 # * https://github.com/googleapis/google-api-python-client/issues/703
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
+# get date received in UTC
+date_received = pendulum.now()
+
 # get auth keys from environment
 airtable_api_key = os.environ['AIRTABLE_API_KEY']
 airtable_base_phoso = os.environ['AIRTABLE_BASE_PHOSO']
@@ -80,6 +83,7 @@ def post_to_airtable(data, chapter_name):
     # save message, get message record ID
     message_data = {
         'Chapter':chapter_name,
+        'Date Received':str(date_received),
         'Sender':[sender_record_id],
         'Text':data['Message Body']
     }
@@ -149,8 +153,6 @@ def post_to_slack(data, chapter_slack_channel):
 
 def handle_photo(data):
     logging.info('Entering handle_photo().')
-    # get date received in UTC
-    date_received = pendulum.now()
 
     # get sender ID from to, from
     data['Sender'] = create_sender_id(data['To Phone'], data['From Phone'])

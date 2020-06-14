@@ -59,7 +59,7 @@ def create_sender_id(recipient, sender):
     hash = b64encode(hash).decode('utf-8').upper()
     return re.sub(r'[^A-Z]', '', hash)[:8]
 
-def assemble_filename(data)
+def assemble_filename(data):
     # get local date and time
     date_received_local = date_received.in_timezone(data['Chapter Timezone'])
     yyyy_mm_dd = date_received_local.strftime('%Y-%m-%d')

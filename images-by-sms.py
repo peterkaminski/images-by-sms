@@ -77,6 +77,7 @@ def find_or_insert(table, field, data):
 def upsert(table, field, data, fields_to_save):
     record = table.match(field, data[field])
     if len(record) == 0:
+        data = {k: v for k, v in data.items() if k in fields_to_save}
         record = table.insert(data)
     else:
         record_fields = record['fields']

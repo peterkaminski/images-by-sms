@@ -118,13 +118,6 @@ def post_to_slack(data, chapter_slack_channel):
           channel=chapter_slack_channel,
           blocks=[
               {
-                  'type': 'section',
-                  'text': {
-                      'type': 'plain_text',
-                      'text': data['Message Body']
-                  }
-              },
-              {
                   "type": "section",
                   "text": {
                       "type": "mrkdwn",
@@ -137,7 +130,17 @@ def post_to_slack(data, chapter_slack_channel):
                   'alt_text': 'Image from SMS sender'
               }
           ]
-      )
+          if len(data['Message Body']):
+              blocks.insert(0, [
+                  {
+                      'type': 'section',
+                      'text': {
+                          'type': 'plain_text',
+                          'text': data['Message Body']
+                      }
+                  }
+              ])
+
     except SlackApiError as e:
         logging.error("Slack API Error: {}".format(e.response["error"]))
     logging.info('Exiting post_to_slack().')

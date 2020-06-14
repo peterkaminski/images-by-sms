@@ -296,9 +296,10 @@ def webhook_images_by_sms():
     logging.info('----------------------------------------------------------------')
     logging.info('Entering webhook_images_by_sms().')
     try:
-        # Log incomingn request.form
+        # Log incoming request.form and SmsMessageSid
         logging.debug('Incoming request.form:')
         logging.debug(request.form)
+        logging.info('SmsMessageSid: <{}>.'.format(request.form['SmsMessageSid']))
 
         # Start our response
         resp = MessagingResponse()

@@ -74,10 +74,28 @@ def find_or_insert(table, field, data):
         record = table.insert(data)
     return record['id']
 
+def upsert(table, field, data, fields_to_save):
+    record = table.match(field, data[field])
+    if len(record) == 0:
+        record = table.insert(data)
+    else:
+        record_fields = record['fields']
+        # use dictionary unpacking to update `record` with `data`
+        data = {**record_fields, **data}
+        data = {k: v for k, v in data.items() if k in fields_to_save}
+        table.update(record['id'], data)
+    return record['id']
+
 def post_to_airtable(data, chapter_name):
     logging.info('Entering post_to_airtable().')
-    # get or set sender_record_id
-    sender_record_id = find_or_insert(senders_table, 'ID', {'ID': data['Sender']})
+    # get or set sender_record_id, save or update record
+    sender_record_id = upsert(
+        senders_table, 'ID', {
+            'ID':data['Sender'],
+            'Last Long Auto-response':str(date_received)
+        },
+        ['ID', 'Last Long Auto-response', 'Messages']
+    )
     del data['Sender']  # don't need field in data anymore
 
     # save message, get message record ID

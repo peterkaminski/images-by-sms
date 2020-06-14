@@ -128,7 +128,7 @@ def post_to_slack(data, chapter_slack_channel):
         }
     ]
     if len(data['Message Body']):
-        blocks.insert(0, [
+        blocks.insert(0,
             {
                 'type': 'section',
                 'text': {
@@ -136,7 +136,7 @@ def post_to_slack(data, chapter_slack_channel):
                     'text': data['Message Body']
                 }
             }
-        ])
+        )
 
     try:
       response = slack_client.chat_postMessage(

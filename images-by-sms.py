@@ -146,7 +146,8 @@ def post_to_airtable(data, chapter_name, date_llr):
 def post_to_gdrive(data, filename, folder):
     logging.info('Entering post_to_gdrive().')
     file = gdrive.CreateFile({
-        'title': data['Filename'] + '.png',
+        'title': data['Filename'],
+        'mimeType': data['Content Type'],
         'parents': [{'id':folder}]
     })
     file.SetContentFile(filename)

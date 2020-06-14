@@ -155,8 +155,8 @@ def post_to_gdrive(data, filename, folder):
     logging.info('Exiting post_to_gdrive().')
     return link
 
-def post_to_slack(data, chapter_slack_channel):
-    logging.info('Entering post_to_slack().')
+def post_to_slack_via_message(data, chapter_slack_channel):
+    logging.info('Entering post_to_slack_via_message().')
     blocks=[
         {
             "type": "section",
@@ -189,7 +189,24 @@ def post_to_slack(data, chapter_slack_channel):
       )
     except SlackApiError as e:
         logging.error("Slack API Error: {}".format(e.response["error"]))
-    logging.info('Exiting post_to_slack().')
+    logging.info('Exiting post_to_slack_via_message().')
+
+def post_to_slack_via_upload(data, filename, chapter_slack_channel):
+    logging.info('Entering post_to_slack_via_upload().')
+
+    try:
+      response = slack_client.conversations_join(
+          channel=chapter_slack_channel
+      )
+      response = slack_client.files_upload(
+          channels=chapter_slack_channel,
+          file=filename,
+          title=data['Filename'],
+          initial_comment = "{}\n<{}|{}> (Google Drive)".format(data['Message Body'], data['Google Drive Link'], data['Filename'])
+      )
+    except SlackApiError as e:
+        logging.error("Slack API Error: {}".format(e.response["error"]))
+    logging.info('Exiting post_to_slack_via_upload().')
 
 def handle_photo(data):
     logging.info('Entering handle_photo().')
@@ -230,7 +247,11 @@ def handle_photo(data):
     except Exception:
         traceback.print_exc()
     try:
-        post_to_slack(data, chapter_slack_channel)
+        post_to_slack_method = 'upload' # set to either 'upload' or 'message'
+        if post_to_slack_method == 'upload':
+            post_to_slack_via_upload(data, tmp_file_path, chapter_slack_channel)
+        if post_to_slack_method == 'message':
+            post_to_slack_via_message(data, chapter_slack_channel)
     except Exception:
         traceback.print_exc()
 

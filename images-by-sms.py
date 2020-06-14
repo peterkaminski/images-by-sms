@@ -87,15 +87,36 @@ def upsert(table, field, data, fields_to_save):
         table.update(record['id'], data)
     return record['id']
 
-def post_to_airtable(data, chapter_name):
+def calc_send_long_response(data, long_response_threshold):
+    logging.info('Entering calc_send_long_response().')
+    sender_record = senders_table.match('ID', data['Sender'])
+    if len(sender_record) == 0:
+        # set to an arbitrary large number
+        llr_interval = 999999999
+    else:
+        try:
+            date_llr = pendulum.parse(sender_record['fields']['Last Long Response'])
+        except ValueError:
+            date_llr = pendulum.now().subtract(years=1)
+        llr_interval = date_received.diff(date_llr).in_minutes()
+    logging.info('Last long response interval = {} minutes.'.format(llr_interval))
+    logging.info('Exiting calc_send_long_response().')
+    if (llr_interval > long_response_threshold):
+        # threshold exceeded, use new date
+        return True, date_received
+    else:
+        # threshold not exceeded, use existing date
+        return False, date_llr
+
+def post_to_airtable(data, chapter_name, date_llr):
     logging.info('Entering post_to_airtable().')
-    # get or set sender_record_id, save or update record
+    # save sender, get sender_record_id
     sender_record_id = upsert(
         senders_table, 'ID', {
             'ID':data['Sender'],
-            'Last Long Auto-response':str(date_received)
+            'Last Long Response':str(date_llr)
         },
-        ['ID', 'Last Long Auto-response', 'Messages']
+        ['ID', 'Last Long Response', 'Messages']
     )
     del data['Sender']  # don't need field in data anymore
 
@@ -196,9 +217,12 @@ def handle_photo(data):
     logging.info('Final URL after redirects: <{}>.'.format(request.url))
     tmp_file_path, headers = urllib.request.urlretrieve(request.url)
 
+    # decide whether to send long response or not
+    send_long_response, date_llr = calc_send_long_response(data, 60)
+
     # post the message to the various destinations
     try:
-        post_to_airtable(data, chapter_row['fields']['Chapter Name'])
+        post_to_airtable(data, chapter_row['fields']['Chapter Name'], date_llr)
     except Exception:
         traceback.print_exc()
     try:
@@ -213,6 +237,7 @@ def handle_photo(data):
     # delete local copy of photo
     os.remove(tmp_file_path)
     logging.info('Exiting handle_photo().')
+    return send_long_response
 
 def main():
     logging.info('Entering main().')
@@ -222,7 +247,7 @@ def main():
         'From Phone': os.environ['FROM_PHONE'],
         'Photo': [{'url': os.environ['MEDIA_URL']}]
     }
-    handle_photo(data)
+    send_long_response = handle_photo(data)
     logging.info('Exiting main().')
 
 app = Flask(__name__)
@@ -247,10 +272,15 @@ def webhook_images_by_sms():
             data['Photo'] = [{'url': request.form['MediaUrl0']}]
 
         # TODO: support multiple photos
-        handle_photo(data)
+        send_long_response = handle_photo(data)
 
-        # respond
-        resp.message(os.environ.get('IMAGES_BY_SMS_RESPONSE', "Message received!"))
+        # set up response
+        if send_long_response:
+            logging.info('Sending long response.')
+            resp.message(os.environ.get('IMAGES_BY_SMS_LONG_RESPONSE', "Message received!"))
+        else:
+            logging.info('Sending short response.')
+            resp.message(os.environ.get('IMAGES_BY_SMS_SHORT_RESPONSE', "Message received!"))
 
         # send response
         return str(resp)

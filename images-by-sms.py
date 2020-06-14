@@ -139,7 +139,7 @@ def post_to_slack(data, chapter_slack_channel):
           ]
       )
     except SlackApiError as e:
-        print(e.response["error"])
+        logging.error("Slack API Error: {}".format(e.response["error"]))
     logging.info('Exiting post_to_slack().')
 
 def handle_photo(data):

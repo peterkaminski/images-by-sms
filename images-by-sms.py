@@ -3,11 +3,12 @@
 # PyPI
 from airtable import Airtable # pip install airtable-python-wrapper
 from flask import Flask, request # pip install flask
-from twilio.twiml.messaging_response import MessagingResponse # pip install twilio
+from PIL import Image # pip install Pillow
 from pydrive.auth import GoogleAuth # pip install PyDrive
 from pydrive.drive import GoogleDrive # pip install PyDrive
 from slack import WebClient # pip install slackclient
 from slack.errors import SlackApiError # pip install slackclient
+from twilio.twiml.messaging_response import MessagingResponse # pip install twilio
 import pendulum # pip install pendulum
 
 # Python
@@ -131,6 +132,8 @@ def post_to_airtable(data, chapter_name, date_llr):
     # save photo to table
     photos_table.insert({
         'Photo': data['Photo'],
+        'Width': data['Width'],
+        'Height': data['Height'],
         'Filename': data['Filename'],
         'Message': [messages_table.insert(message_data)['id']]
     })
@@ -233,6 +236,15 @@ def handle_photo(data):
     request = requests.get(url, allow_redirects=True)
     logging.info('Final URL after redirects: <{}>.'.format(request.url))
     tmp_file_path, headers = urllib.request.urlretrieve(request.url)
+
+    # get photo size
+    data['Width'] = 0
+    data['Height'] = 0
+    try:
+        photo = Image.open(tmp_file_path)
+        data['Width'], data['Height'] = photo.size
+    except Exception:
+        traceback.print_exc()
 
     # decide whether to send long response or not
     send_long_response, date_llr = calc_send_long_response(data, 60)

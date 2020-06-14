@@ -59,8 +59,9 @@ def create_sender_id(recipient, sender):
     hash = b64encode(hash).decode('utf-8').upper()
     return re.sub(r'[^A-Z]', '', hash)[:8]
 
-def assemble_filename(data, chapter_abbreviation, date_received_local):
+def assemble_filename(data)
     # get local date and time
+    date_received_local = date_received.in_timezone(data['Chapter Timezone'])
     yyyy_mm_dd = date_received_local.strftime('%Y-%m-%d')
     hhmm = date_received_local.strftime('%H%M')
 
@@ -71,7 +72,7 @@ def assemble_filename(data, chapter_abbreviation, date_received_local):
     extension = mimetypes.guess_extension(data['Content Type'])
 
     # assemble filename
-    return '{}_{}_{}_{}_{}{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, chapter_abbreviation, extension)
+    return '{}_{}_{}_{}_{}{}'.format(yyyy_mm_dd, data['Sender'], hhmm, random_digits, data['Chapter Abbreviation'], extension)
 
 def find_or_insert(table, field, data):
     record = table.match(field, data[field])
@@ -113,7 +114,7 @@ def calc_send_long_response(data, long_response_threshold):
         # threshold not exceeded, use existing date
         return False, date_llr
 
-def post_to_airtable(data, chapter_name, date_llr):
+def post_to_airtable(data, date_llr):
     logging.info('Entering post_to_airtable().')
     # save sender, get sender_record_id
     sender_record_id = upsert(
@@ -123,11 +124,10 @@ def post_to_airtable(data, chapter_name, date_llr):
         },
         ['ID', 'Last Long Response', 'Messages']
     )
-    del data['Sender']  # don't need field in data anymore
 
     # save message, get message record ID
     message_data = {
-        'Chapter':chapter_name,
+        'Chapter':data['Chapter Name'],
         'Date Received':str(date_received),
         'Sender':[sender_record_id],
         'Text':data['Message Body']
@@ -143,12 +143,12 @@ def post_to_airtable(data, chapter_name, date_llr):
     })
     logging.info('Exiting post_to_airtable().')
 
-def post_to_gdrive(data, filename, folder):
+def post_to_gdrive(data, filename):
     logging.info('Entering post_to_gdrive().')
     file = gdrive.CreateFile({
         'title': data['Filename'],
         'mimeType': data['Content Type'],
-        'parents': [{'id':folder}]
+        'parents': [{'id':data['Chapter Google Drive Folder']}]
     })
     file.SetContentFile(filename)
     file.Upload()
@@ -163,7 +163,7 @@ def post_to_gdrive(data, filename, folder):
     logging.info('Exiting post_to_gdrive().')
     return link
 
-def post_to_slack_via_message(data, chapter_slack_channel):
+def post_to_slack_via_message(data):
     logging.info('Entering post_to_slack_via_message().')
     blocks=[
         {
@@ -192,22 +192,22 @@ def post_to_slack_via_message(data, chapter_slack_channel):
 
     try:
       response = slack_client.chat_postMessage(
-          channel=chapter_slack_channel,
+          channel=data['Chapter Slack Channel'],
           blocks=blocks
       )
     except SlackApiError as e:
         logging.error("Slack API Error: {}".format(e.response["error"]))
     logging.info('Exiting post_to_slack_via_message().')
 
-def post_to_slack_via_upload(data, filename, chapter_slack_channel):
+def post_to_slack_via_upload(data, filename):
     logging.info('Entering post_to_slack_via_upload().')
 
     try:
       response = slack_client.conversations_join(
-          channel=chapter_slack_channel
+          channel=data['Chapter Slack Channel']
       )
       response = slack_client.files_upload(
-          channels=chapter_slack_channel,
+          channels=data['Chapter Slack Channel'],
           file=filename,
           title=data['Filename'],
           initial_comment = "{}\n<{}|{}> (Google Drive)".format(data['Message Body'], data['Google Drive Link'], data['Filename'])
@@ -219,21 +219,8 @@ def post_to_slack_via_upload(data, filename, chapter_slack_channel):
 def handle_photo(data):
     logging.info('Entering handle_photo().')
 
-    # get sender ID from to, from
-    data['Sender'] = create_sender_id(data['To Phone'], data['From Phone'])
-
-    # get chapter data
-    chapter_row = chapters_table.match('SMS Phone Number', data['To Phone'])
-    chapter_timezone = chapter_row['fields']['Timezone']
-    chapter_gdrive_folder = chapter_row['fields']['Google Drive Folder']
-    chapter_slack_channel = chapter_row['fields']['Slack Channel']
-
     # assemble filename
-    data['Filename'] = assemble_filename(
-        data,
-        chapter_row['fields']['City Name Abbreviation'],
-        date_received.in_timezone(chapter_timezone)
-    )
+    data['Filename'] = assemble_filename(data)
 
     # retrieve photo from URL
     url = data['Photo'][0]['url']
@@ -256,19 +243,19 @@ def handle_photo(data):
 
     # post the message to the various destinations
     try:
-        post_to_airtable(data, chapter_row['fields']['Chapter Name'], date_llr)
+        post_to_airtable(data, date_llr)
     except Exception:
         traceback.print_exc()
     try:
-        data['Google Drive Link'] = post_to_gdrive(data, tmp_file_path, chapter_gdrive_folder)
+        data['Google Drive Link'] = post_to_gdrive(data, tmp_file_path)
     except Exception:
         traceback.print_exc()
     try:
         post_to_slack_method = 'upload' # set to either 'upload' or 'message'
         if post_to_slack_method == 'upload':
-            post_to_slack_via_upload(data, tmp_file_path, chapter_slack_channel)
+            post_to_slack_via_upload(data, tmp_file_path)
         if post_to_slack_method == 'message':
-            post_to_slack_via_message(data, chapter_slack_channel)
+            post_to_slack_via_message(data)
     except Exception:
         traceback.print_exc()
 
@@ -311,13 +298,24 @@ def webhook_images_by_sms():
             'From Phone': request.form['From']
         }
 
-        # add first photo if it exists
-        if 'MediaUrl0' in request.form:
-            data['Photo'] = [{'url': request.form['MediaUrl0']}]
-            data['Content Type'] = request.form['MediaContentType0']
+        # get sender ID from to, from
+        data['Sender'] = create_sender_id(data['To Phone'], data['From Phone'])
 
-        # TODO: support multiple photos
-        send_long_response = handle_photo(data)
+        # get chapter data
+        chapter_row = chapters_table.match('SMS Phone Number', data['To Phone'])
+        data['Chapter Name'] = chapter_row['fields']['Chapter Name']
+        data['Chapter Abbreviation'] = chapter_row['fields']['City Name Abbreviation']
+        data['Chapter Timezone'] = chapter_row['fields']['Timezone']
+        data['Chapter Google Drive Folder'] = chapter_row['fields']['Google Drive Folder']
+        data['Chapter Slack Channel'] = chapter_row['fields']['Slack Channel']
+
+        # handle photos
+        send_long_response = False
+        for media_index in range(0, request.form['NumMedia']):
+            logging.info('Handling photo {}.'.format(media_index))
+            data['Photo'] = [{'url': request.form['MediaUrl{}'.format(media_index)]}]
+            data['Content Type'] = request.form['MediaContentType{}'.format(media_index)]
+            send_long_response |= handle_photo(data)
 
         # set up response
         if send_long_response:

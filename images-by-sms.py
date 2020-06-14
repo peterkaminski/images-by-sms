@@ -113,34 +113,36 @@ def post_to_gdrive(data, filename, folder):
 
 def post_to_slack(data, chapter_slack_channel):
     logging.info('Entering post_to_slack().')
+    blocks=[
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "<{}|{}> (Google Drive)".format(data['Google Drive Link'], data['Filename'])
+            }
+        },
+        {
+            'type': 'image',
+            'image_url': data['Photo'][0]['url'],
+            'alt_text': 'Image from SMS sender'
+        }
+    ]
+    if len(data['Message Body']):
+        blocks.insert(0, [
+            {
+                'type': 'section',
+                'text': {
+                    'type': 'plain_text',
+                    'text': data['Message Body']
+                }
+            }
+        ])
+
     try:
       response = slack_client.chat_postMessage(
           channel=chapter_slack_channel,
-          blocks=[
-              {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "<{}|{}> (Google Drive)".format(data['Google Drive Link'], data['Filename'])
-                  }
-              },
-              {
-                  'type': 'image',
-                  'image_url': data['Photo'][0]['url'],
-                  'alt_text': 'Image from SMS sender'
-              }
-          ]
-          if len(data['Message Body']):
-              blocks.insert(0, [
-                  {
-                      'type': 'section',
-                      'text': {
-                          'type': 'plain_text',
-                          'text': data['Message Body']
-                      }
-                  }
-              ])
-
+          blocks=blocks
+      )
     except SlackApiError as e:
         logging.error("Slack API Error: {}".format(e.response["error"]))
     logging.info('Exiting post_to_slack().')

@@ -311,7 +311,7 @@ def webhook_images_by_sms():
 
         # handle photos
         send_long_response = False
-        for media_index in range(0, request.form['NumMedia']):
+        for media_index in range(0, int(request.form['NumMedia'])):
             logging.info('Handling photo {}.'.format(media_index))
             data['Photo'] = [{'url': request.form['MediaUrl{}'.format(media_index)]}]
             data['Content Type'] = request.form['MediaContentType{}'.format(media_index)]

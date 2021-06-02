@@ -36,6 +36,6 @@ six==1.15.0
 slackclient==2.7.1
 twilio==6.41.0
 uritemplate==3.0.1
-urllib3==1.25.9
+urllib3==1.26.5
 Werkzeug==1.0.1
 yarl==1.4.2
